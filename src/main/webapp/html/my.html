@@ -5,7 +5,228 @@
     <link href="/css/my.css" rel="stylesheet">
 </head>
 <body>
-<h1>RPG admin panel</h1>
+    <h1>RPG admin panel</h1>
 
+    <div id="count-per-page">
+        Count per page:
+        <select id="elemets-per-page" onchange="drawPlayers(0)">
+            <option value="5">5</option>
+            <option value="8">8</option>
+            <option value="10">10</option>
+            <option value="20">20</option>
+        </select>
+    </div>
+
+    <table id="accounts-table">
+        <tr>
+            <th> # </th> <th> Name </th> <th> Title </th> <th> Race </th> <th> Profession </th> <th> Birthday </th> <th> Banned </th> <th> Level </th>
+        </tr>
+    </table>
+    <div id="paging"> </div>
+
+    <hr>
+    <h1> Create New Account: </h1>
+    <p>Name: <input type="text" id="name-create" minlength="1" maxlength="12"></p>
+    <p>Title: <input type="text" id="title-create" minlength="1" maxlength="30"></p>
+    <p id="race-selector-create">Race: </p>
+    <p id="profession-selector-create">Profession: </p>
+    <p>Level: <input type="number" id="level-create" min="1" max="100"></p>
+    <p>Birthday: <input type="date" id="birthday-create"></p>
+    <p id="banned-selector-create">Banned: </p>
+    <p><button id="save-new-user" onclick="saveNewPlayer()">Save</button></p>
+
+    <script>
+
+        function getRaceSelector(selector_id){
+            return `<select id="${selector_id}">`
+                + '<option>HUMAN</option>'
+                + '<option>DWARF</option>'
+                + '<option>ELF</option>'
+                + '<option>GIANT</option>'
+                + '<option>ORC</option>'
+                + '<option>TROLL</option>'
+                + '<option>HOBBIT</option>'
+                + '</select>'
+        }
+
+        function getProfessionSelector(selector_id){
+            return `<select id="${selector_id}">`
+                + '<option>WARRIOR</option>'
+                + '<option>ROGUE</option>'
+                + '<option>SORCERER</option>'
+                + '<option>CLERIC</option>'
+                + '<option>PALADIN</option>'
+                + '<option>NAZGUL</option>'
+                + '<option>WARLOCK</option>'
+                + '<option>DRUID</option>'
+                + '</select>'
+        }
+
+        function getBannedSelector(selector_id){
+            return `<select id="${selector_id}">`
+                + '<option>false</option>'
+                + '<option>true</option>'
+                + '</select>'
+        }
+
+        function saveNewPlayer(){
+
+            console.log($("#name-create").val());
+            console.log($("#title-create").val());
+            console.log($("#race-create").val());
+            console.log($("#profession-create").val());
+            console.log($("#level-create").val());
+            console.log($("#birthday-create").val());
+            console.log($("#banned-create").val());
+
+            $.ajax({
+                url: "/rest/players",
+                type: 'POST',
+                dataType: 'json',
+                contentType: 'application/json;charset=UTF-8',
+                data: JSON.stringify({
+                    'name':$("#name-create").val(),
+                    'title':$("#title-create").val(),
+                    'race':$("#race-create").val(),
+                    'profession':$("#profession-create").val(),
+                    'level':$("#level-create").val(),
+                    'birthday':new Date($("#birthday-create").val()).getTime(),
+                    'banned':$("#banned-create").val()
+                }),
+                async: false,
+                success: function() {
+                    drawPlayers(1);
+                }
+            });
+        }
+
+        function getPlayersCount(){
+            let result = null;
+            $.ajax({
+                url: "/rest/players/count",
+                type: 'get',
+                dataType: 'html',
+                async: false,
+                success: function(data) {
+                    result = data;
+                }});
+            return result;
+        }
+
+        function deleteUser(id, pageNumber){
+            $.ajax({
+                url: "/rest/players/"+id,
+                type: 'delete',
+                dataType: 'html',
+                async: false,
+                success: function() {
+                    drawPlayers(pageNumber);
+                }
+            });
+        }
+
+        function saveUser(row_id, pageNumber){
+            let rowById = document.querySelector('#accounts-table tr[id="row-'+row_id+'"]');
+            let dataToSend = {};
+
+            for (const cell of rowById.cells){
+                if (["name","title","race","profession","banned"].includes(cell.id)) {
+                    dataToSend[cell.id] = $(`#${cell.id}-input`).val();
+                }
+            }
+
+            $.ajax({
+                url: "/rest/players/"+rowById.querySelector('td[id=id]').textContent,
+                type: 'POST',
+                dataType: 'json',
+                contentType: 'application/json;charset=UTF-8',
+                data: JSON.stringify(dataToSend),
+                async: false,
+                success: function() {
+                    drawPlayers(pageNumber);
+                }
+            });
+        }
+
+        function editUser(row_id, pageNumber){
+
+            let rowById = document.querySelector('#accounts-table tr[id="row-'+row_id+'"]');
+
+            let deleteButton = rowById.querySelector('td[id="delete-button"]');
+            deleteButton.innerHTML="";
+            let editButton = rowById.querySelector('td[id="edit-button"]');
+            editButton.innerHTML = `<td id='edit-button'> <img src='img/save.png' onclick='saveUser(${row_id}, ${pageNumber})'> </td>`;
+
+            for (const cell of rowById.cells){
+                if (cell.id.toLowerCase()=='name'){
+                    cell.innerHTML = '<input type="text" id="name-input">';
+                } else if (cell.id.toLowerCase()=='title'){
+                    cell.innerHTML = '<input type="text" id="title-input">';
+                } else if (cell.id.toLowerCase()=='race'){
+                    cell.innerHTML = `${getRaceSelector("race-input")}`;
+                } else if (cell.id.toLowerCase()=='profession'){
+                    cell.innerHTML = `${getProfessionSelector("profession-input")}`;
+                } else if (cell.id.toLowerCase()=='banned'){
+                    cell.innerHTML = `${getBannedSelector("banned-input")}`;
+                }
+            }
+        }
+
+        function drawPage(data, pageNumber){
+            let table = document.getElementById("accounts-table");
+            table.innerHTML="<th> # </th> <th> Name </th> <th> Title </th> <th> Race </th> <th> Profession </th> <th> Birthday </th> <th> Banned </th> <th> Level </th> <th> Edit </th> <th> Delete </th>";
+            for (let i = 0; i < data.length; i++){
+                let newTableHtml = "<tr id='row-"+i+"'>";
+                for (let key in data[i]){
+                    newTableHtml += "<td id='"+key+"'>" + data[i][key] + "</td>";
+                }
+
+                newTableHtml += `<td id="edit-button"> <img src="img/edit.png" onclick="editUser(
+                                                                                            ${i},
+                                                                                            '${pageNumber}'
+                                                                                            )"></td>`;
+                newTableHtml += "<td id='delete-button'> <img src='img/delete.png' onclick='deleteUser("+ data[i]['id'] +","+pageNumber+")'> </td>";
+
+                newTableHtml += "<tr>";
+                table.innerHTML += newTableHtml;
+            }
+
+            let buttonsElement = document.getElementById("paging");
+            buttonsElement.innerHTML="Pages: ";
+
+            let countRecordsPerPage = $("#elemets-per-page").val();
+            let countPlayers = getPlayersCount();
+
+            for (let j = 0; j < countPlayers/countRecordsPerPage; j++) {
+                let currentPage = j+1;
+                if (j==pageNumber){
+                    buttonsElement.innerHTML += '<button type="button" style="color: red" onclick="drawPlayers('+j.toString()+')">'+currentPage+'</button>';
+                } else {
+                    buttonsElement.innerHTML += '<button type="button" onclick="drawPlayers('+j.toString()+')">'+currentPage+'</button>';
+                }
+            }
+
+        }
+
+        function drawPlayers(pageNumber){
+            let countRecordsPerPage = $("#elemets-per-page").val();
+            $.ajax({
+                url: "/rest/players/?pageSize="+countRecordsPerPage+"&pageNumber="+parseInt(pageNumber),
+                type: 'get',
+                dataType: 'html',
+                async: false,
+                success: function(data) {
+                    data = $.parseJSON(data);
+                    drawPage(data, pageNumber);
+                }
+            });
+        }
+
+        document.getElementById('profession-selector-create').innerHTML += getProfessionSelector("profession-create");
+        document.getElementById('race-selector-create').innerHTML += getRaceSelector("race-create");
+        document.getElementById('banned-selector-create').innerHTML += getBannedSelector("banned-create");
+        drawPlayers(0);
+
+    </script>
 </body>
 </html>
